@@ -25,7 +25,7 @@
   query:
     - ids
     - client_id
-  notes: "Returns a collection. The ids parameter is comma-separated."
+  notes: "Returns a JSON array, not a collection envelope. The ids parameter is comma-separated."
 
 - id: track-comments
   area: tracks

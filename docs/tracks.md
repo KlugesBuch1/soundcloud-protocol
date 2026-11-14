@@ -77,10 +77,10 @@ The suffix is part of the image URL. Replace `-large` with another suffix.
 
 | Route | Result |
 | --- | --- |
-| `GET /tracks?ids={track_ids}` | A `collection` of tracks |
+| `GET /tracks?ids={track_ids}` | An array of track objects |
 | `GET /tracks/{track_id}` | One track object |
 
-`{track_ids}` is comma-separated. The ids route returns a single response, not a paginated page.
+`{track_ids}` is comma-separated. The ids route returns a JSON array, not a `collection` envelope. It is not paginated.
 
 ## Comments
 

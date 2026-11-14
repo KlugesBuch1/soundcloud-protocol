@@ -42,8 +42,7 @@ impl Client {
             .map(u64::to_string)
             .collect::<Vec<_>>()
             .join(",");
-        let page: Collection<Track> = self.get("/tracks", &[("ids", ids)]).await?;
-        Ok(page.collection)
+        self.get("/tracks", &[("ids", ids)]).await
     }
 
     /// Searches tracks.
@@ -416,11 +415,6 @@ pub enum Resolved {
     Playlist(Playlist),
 }
 
-#[derive(Debug, Deserialize)]
-struct Collection<T> {
-    collection: Vec<T>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -503,8 +497,8 @@ mod tests {
 
     #[test]
     fn parses_track_list() {
-        let page: Collection<Track> = load("tracks.json");
-        assert_eq!(page.collection.len(), 2);
+        let tracks: Vec<Track> = load("tracks.json");
+        assert_eq!(tracks.len(), 2);
     }
 
     #[test]

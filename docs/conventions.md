@@ -58,7 +58,7 @@ A 401 with a missing client id does not prove that the path exists. A 404 with a
 
 ## Pagination
 
-List routes return an object with `collection`. Track and user routes also return `next_href`. Search routes add `total_results` and `query_urn`.
+List routes return an object with `collection`. `/tracks?ids=` is the exception: it returns a bare array. Track and user routes also return `next_href`. Search routes add `total_results` and `query_urn`.
 
 | Field | Meaning |
 | --- | --- |
