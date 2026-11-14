@@ -1,6 +1,6 @@
 """Probe the read routes in endpoints.yaml.
 
-The client id is read from SC_CLIENT_ID and never written.
+The client id comes from SC_CLIENT_ID or from the web player. It is never written.
 """
 
 import argparse
@@ -14,6 +14,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+from client_id import discover
 
 try:
     import yaml
@@ -158,7 +160,11 @@ def main():
 
     client_id = os.environ.get("SC_CLIENT_ID", "")
     if not client_id:
-        sys.exit("SC_CLIENT_ID is not set")
+        try:
+            client_id = discover(args.timeout)
+        except (OSError, RuntimeError) as error:
+            sys.exit(f"could not resolve the client id: {error}")
+        print("resolved a client id from the web player", file=sys.stderr)
 
     manifest = ROOT / "endpoints.yaml"
     entries = [

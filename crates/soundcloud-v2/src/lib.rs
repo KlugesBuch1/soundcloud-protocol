@@ -1,11 +1,17 @@
 #![deny(missing_docs)]
 //! Read-only client for the api-v2 routes documented in this repository.
 
+use std::time::Duration;
+
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 
 const DEFAULT_BASE_URL: &str = "https://api-v2.soundcloud.com";
+const PLAYER_URL: &str = "https://soundcloud.com/";
+const ASSET_PREFIX: &str = "https://a-v2.sndcdn.com/assets/";
+const ID_MARKER: &str = "client_id:\"";
+const BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 /// Client for the measured read routes.
 pub struct Client {
@@ -28,6 +34,53 @@ impl Client {
     pub fn with_base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = base_url.into().trim_end_matches('/').to_string();
         self
+    }
+
+    /// Creates a client by resolving the current client id from the web player.
+    ///
+    /// Reads the landing page, fetches the player assets it references and uses
+    /// the first `client_id` literal it finds. The value is kept in memory.
+    pub async fn discover() -> Result<Self, Error> {
+        let http = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()?;
+        let response = http
+            .get(PLAYER_URL)
+            .header(reqwest::header::USER_AGENT, BROWSER_USER_AGENT)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            return Err(Error::Discovery(format!(
+                "the player page returned HTTP {}",
+                response.status().as_u16()
+            )));
+        }
+        let html = response.text().await?;
+        let urls = script_urls(&html);
+        if urls.is_empty() {
+            return Err(Error::Discovery(
+                "the player page referenced no assets".to_string(),
+            ));
+        }
+        for url in urls {
+            let response = http
+                .get(&url)
+                .header(reqwest::header::USER_AGENT, BROWSER_USER_AGENT)
+                .send()
+                .await?;
+            if !response.status().is_success() {
+                continue;
+            }
+            let script = response.text().await?;
+            if let Some(id) = find_client_id(&script) {
+                let mut client = Client::new(id.to_string());
+                client.http = http;
+                return Ok(client);
+            }
+        }
+        Err(Error::Discovery(
+            "no client id in the player assets".to_string(),
+        ))
     }
 
     /// Returns one track.
@@ -153,6 +206,9 @@ pub enum Error {
         /// Response body.
         body: String,
     },
+    /// The client id could not be resolved from the web player.
+    #[error("client id discovery failed: {0}")]
+    Discovery(String),
     /// The request failed before a response was decoded.
     #[error(transparent)]
     Request(#[from] reqwest::Error),
@@ -415,6 +471,38 @@ pub enum Resolved {
     Playlist(Playlist),
 }
 
+fn script_urls(html: &str) -> Vec<String> {
+    let mut urls: Vec<String> = Vec::new();
+    let mut rest = html;
+    while let Some(start) = rest.find(ASSET_PREFIX) {
+        let tail = &rest[start..];
+        let Some(end) = tail.find('"') else {
+            break;
+        };
+        let url = &tail[..end];
+        if url.ends_with(".js") && !urls.iter().any(|seen| seen.as_str() == url) {
+            urls.push(url.to_string());
+        }
+        rest = &tail[end..];
+    }
+    urls
+}
+
+fn find_client_id(script: &str) -> Option<&str> {
+    let mut rest = script;
+    while let Some(start) = rest.find(ID_MARKER) {
+        let tail = &rest[start + ID_MARKER.len()..];
+        if tail.len() > 32 && tail.is_char_boundary(32) && tail.as_bytes()[32] == b'"' {
+            let id = &tail[..32];
+            if id.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+                return Some(id);
+            }
+        }
+        rest = tail;
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -427,6 +515,44 @@ mod tests {
             .join(name);
         let text = fs::read_to_string(path).expect("read example");
         serde_json::from_str(&text).expect("parse example")
+    }
+
+    const FAKE_ID: &str = "0123456789abcdefghijklmnopqrstuv";
+
+    #[test]
+    fn extracts_script_urls() {
+        let html = r#"<script src="https://a-v2.sndcdn.com/assets/59-ac0a49ce.js"></script>
+<script src="https://example.com/app.js"></script>
+<script src="https://a-v2.sndcdn.com/assets/55-a70a06aa.js"></script>
+<script src="https://a-v2.sndcdn.com/assets/59-ac0a49ce.js"></script>"#;
+        assert_eq!(
+            script_urls(html),
+            vec![
+                "https://a-v2.sndcdn.com/assets/59-ac0a49ce.js",
+                "https://a-v2.sndcdn.com/assets/55-a70a06aa.js",
+            ]
+        );
+    }
+
+    #[test]
+    fn extracts_client_id() {
+        let script = format!(r#"e.client_id:"{FAKE_ID}",t"#);
+        assert_eq!(find_client_id(&script), Some(FAKE_ID));
+    }
+
+    #[test]
+    fn skips_malformed_client_ids() {
+        assert_eq!(find_client_id(r#"client_id:"short""#), None);
+        assert_eq!(
+            find_client_id(r#"client_id:"0123456789abcdefghijklmnopqrstu-""#),
+            None
+        );
+        assert_eq!(find_client_id("no marker"), None);
+        assert_eq!(find_client_id(&format!(r#"client_id:"{FAKE_ID}x""#)), None);
+        assert_eq!(
+            find_client_id(&format!(r#"client_id:"short",client_id:"{FAKE_ID}""#)),
+            Some(FAKE_ID)
+        );
     }
 
     #[test]

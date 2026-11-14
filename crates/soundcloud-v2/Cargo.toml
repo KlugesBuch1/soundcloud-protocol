@@ -1,6 +1,6 @@
 [package]
 name = "soundcloud-v2"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Read-only client for the SoundCloud api-v2 routes in the catalogue"
 license = "MIT"

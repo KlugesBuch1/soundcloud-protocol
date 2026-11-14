@@ -22,6 +22,8 @@ The two responses are identical. A tokenless probe cannot separate a live route 
 
 A stored id can go stale. Resolve the current asset when a 401 appears.
 
+`tools/probe.py` and `Client::discover()` resolve the value at runtime. They read the landing page, collect the assets it references and search each one for the literal. `SC_CLIENT_ID` overrides the result in the probe. The value stays in memory. If the page or the literal changes shape, the resolver returns an error instead of sending a stale value.
+
 ## User token
 
 The user credential is a header:

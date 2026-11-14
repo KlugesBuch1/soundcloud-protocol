@@ -20,15 +20,19 @@ use soundcloud_v2::Client;
 
 #[tokio::main]
 async fn main() -> Result<(), soundcloud_v2::Error> {
-    let client = Client::new(std::env::var("SC_CLIENT_ID").unwrap());
+    let client = Client::discover().await?;
     let track = client.track(123456789).await?;
     println!("{}", track.title.unwrap_or_default());
     Ok(())
 }
 ```
 
+`Client::new(client_id)` takes a value you already hold. `Client::discover()` reads
+soundcloud.com, scans the player assets and uses the current id. Neither writes one to disk.
+
 ## Coverage
 
+- Resolve the current client id from the web player.
 - One track, and several tracks by id.
 - Search for tracks.
 - A user, and a user's tracks.

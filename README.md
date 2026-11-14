@@ -24,6 +24,7 @@ It is unofficial and does not cover the whole API surface.
 | [`docs/errors.md`](docs/errors.md) | 401, 404 and the shape each one returns |
 | [`docs/endpoint-index.md`](docs/endpoint-index.md) | The same 27 routes as a table |
 | [`tools/probe.py`](tools/probe.py) | Re-checks every read route and prints the status |
+| [`tools/client_id.py`](tools/client_id.py) | Resolves the current player client id |
 | [`tools/from_har.py`](tools/from_har.py) | Extracts routes from a HAR file and writes trimmed examples |
 | [`examples/`](examples) | Trimmed response bodies with placeholder ids |
 
@@ -31,7 +32,8 @@ It is unofficial and does not cover the whole API surface.
 
 [`crates/soundcloud-v2`](crates/soundcloud-v2) is the reference Rust client for these endpoints. It
 covers tracks, tracks by ids, search, users, playlists, resolve, transcoding resolve, charts and
-comments. Published on crates.io as [`soundcloud-v2`](https://crates.io/crates/soundcloud-v2).
+comments. `Client::discover()` resolves the current client id. Published on crates.io as
+[`soundcloud-v2`](https://crates.io/crates/soundcloud-v2).
 
 ## The index
 
@@ -93,11 +95,10 @@ All ids in the docs and examples are placeholders. The examples use track `12345
 
 ## Probe
 
-`tools/probe.py` reads `endpoints.yaml` and sends every read route with browser headers and at least one second between requests. It sends `{}` for reads that are POST. It needs a client id in `SC_CLIENT_ID`, never resolves one itself and never writes one to disk.
+`tools/probe.py` reads `endpoints.yaml` and sends every read route with browser headers and at least one second between requests. It sends `{}` for reads that are POST. It uses `SC_CLIENT_ID` when the variable is set and otherwise resolves the current id from the web player. It never writes a client id to disk.
 
 ```powershell
 python -m pip install pyyaml
-$env:SC_CLIENT_ID = Read-Host
 python tools/probe.py
 ```
 
@@ -118,7 +119,7 @@ No route was dropped for a 404. The three write routes and `/me` were measured w
 
 The service changes. A route that once returned 200 can disappear, and the client id rotates.
 
-1. Resolve a current client id before running the probe.
+1. Run the probe. It resolves a current client id when `SC_CLIENT_ID` is unset.
 2. Check the route with `tools/probe.py` before you trust it.
 3. Treat headers as observed, not required. The list records what the measured requests carried.
 
