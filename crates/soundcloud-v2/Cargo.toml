@@ -5,6 +5,7 @@ edition = "2021"
 description = "Read-only client for the SoundCloud api-v2 routes in the catalogue"
 license = "MIT"
 repository = "https://github.com/KlugesBuch1/soundcloud-protocol"
+readme = "README.md"
 keywords = ["soundcloud", "api", "http", "client", "catalogue"]
 categories = ["api-bindings", "web-programming::http-client"]
 
