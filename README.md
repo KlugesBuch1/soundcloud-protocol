@@ -6,7 +6,7 @@ A catalogue of the HTTP API used by the SoundCloud web player. It covers `api-v2
 
 The source of truth is [endpoints.yaml](endpoints.yaml). A route that is not in that file is not part of the catalogue.
 
-The catalogue does not cover uploads, account settings, messaging, payments or private resources. It does not execute likes or comments with a user token. It does not perform the DRM licence exchange or serve CDN media.
+The catalogue does not cover uploads, account settings, messaging, payments or private resources. It does not send authenticated likes or comments. It does not perform the DRM licence exchange or serve CDN media.
 
 ## Areas
 
@@ -23,6 +23,8 @@ The catalogue does not cover uploads, account settings, messaging, payments or p
 | Likes | [docs/likes.md](docs/likes.md) |
 | Errors | [docs/errors.md](docs/errors.md) |
 | Endpoint index | [docs/endpoint-index.md](docs/endpoint-index.md) |
+
+The read-only Rust client is in [`crates/soundcloud-v2`](crates/soundcloud-v2).
 
 ## Probe
 

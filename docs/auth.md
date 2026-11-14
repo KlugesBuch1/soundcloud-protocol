@@ -43,7 +43,3 @@ Authorization: OAuth <token>
 | `GET /users/{user_id}/followings` | 200 | Not required |
 
 The catalogue does not record how to obtain a user token. That flow was not measured.
-
-## Read routes and user state
-
-Public track, user, playlist, search, chart, comment and stream reads worked with only the client id. The `/me` response is the one read route that needs a user token. Likes are readable for another user with the client id.

@@ -31,7 +31,7 @@ Example ids in this repository are synthetic. Track `123456789`, user `987654321
 | `Referer` | `https://soundcloud.com/` | Every measured request |
 | `Authorization` | `OAuth <token>` | Routes that need a user token |
 
-`client_id` is a query parameter, not a header. A request with `User-Agent` and `Accept` and no `Origin` or `Referer` returned 200 for `/tracks/{track_id}`. The header list records what the requests carried. It does not show that every header is required.
+`client_id` is a query parameter, not a header. A request with `User-Agent` and `Accept` and no `Origin` or `Referer` returned 200 for `/tracks/{track_id}`. The header list records what the requests carried. It does not show that every header is required. The `auth` field in `endpoints.yaml` names the credential the route needs. The write routes and `/me` were measured without a user token; their 401 came from an unauthenticated request. Query parameters have the same limit: a listed parameter was sent, and the notes record the cases where it was required.
 
 ## Status codes
 
@@ -72,9 +72,3 @@ List routes return an object with `collection`. Track and user routes also retur
 ## Time
 
 Object timestamps are UTC ISO 8601 strings with a `Z` suffix and second precision, for example `2025-01-01T00:00:00Z`. The `next_href` cursor for user tracks can contain milliseconds. Chart `last_updated` uses the same timestamp format.
-
-## Observed and required
-
-The `auth` field in `endpoints.yaml` records what was sent. It is not proof that a route rejects every other form. The measured 401s are proof that the client id gate exists. The measured 200s with only `User-Agent` and `Accept` are proof that `Origin` and `Referer` were not required on that route.
-
-Query parameters have the same limit. A parameter listed in the index was sent during measurement. It may have a default. The notes record the cases where a parameter was required.

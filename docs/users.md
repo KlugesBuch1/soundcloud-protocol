@@ -67,11 +67,11 @@ Each item in `/likes` is an envelope, not a bare track:
 }
 ```
 
-The `track` value is a track object. The route worked with a client id and no user token.
+The `track` value is a track object.
 
 ## Followers, followings and related artists
 
-All three return `collection` arrays of user objects. `next_href` carries the next page. The arrays are not track collections.
+All three return `collection` arrays of user objects. `next_href` carries the next page.
 
 ## Examples
 

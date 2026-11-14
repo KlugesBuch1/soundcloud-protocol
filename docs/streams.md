@@ -6,9 +6,8 @@
 | --- | --- | --- |
 | 1 | `GET /tracks/{track_id}` | `media.transcodings[]` |
 | 2 | `GET /media/{media_path}` | JSON with `url` |
-| 3 | `GET url` | Audio bytes or an HLS playlist |
 
-The transcoding `url` is an `api-v2.soundcloud.com` URL. The part after `/media/` is the `{media_path}` value. The `client_id` is required on step 2.
+Play the returned `url`. The transcoding `url` is an `api-v2.soundcloud.com` URL. The part after `/media/` is the `{media_path}` value. The `client_id` is required on step 2.
 
 ## Protocols
 

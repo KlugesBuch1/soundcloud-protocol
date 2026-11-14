@@ -53,7 +53,7 @@
 | `format.protocol` | `progressive`, `hls`, `ctr-encrypted-hls` or `cbc-encrypted-hls` |
 | `format.mime_type` | MIME type of the rendition |
 
-A `SNIP` track carried `snipped: true` and `duration: 30000` on both of its transcodings. A `BLOCK` track carried an empty array.
+A `SNIP` track carried `snipped: true` on both of its transcodings.
 
 ## Artwork sizes
 
@@ -72,8 +72,6 @@ The suffix is part of the image URL. Replace `-large` with another suffix.
 | `-small` | 32 x 32 |
 | `-crop` | 225 x 300 |
 | `-badge` | 47 x 47 |
-
-The measured `-large` image was 100 x 100, not 500 x 500.
 
 ## Track ids
 
