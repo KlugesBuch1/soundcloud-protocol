@@ -1,0 +1,422 @@
+- id: track
+  area: tracks
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /tracks/{track_id}
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/tracks.md
+  summary: One track and its transcodings.
+  query:
+    - client_id
+  notes: "media.transcodings[] carried HLS entries. A second measured track carried HLS and progressive entries."
+
+- id: tracks
+  area: tracks
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /tracks
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/tracks.md
+  summary: Several tracks by id.
+  query:
+    - ids
+    - client_id
+  notes: "Returns a collection. The ids parameter is comma-separated."
+
+- id: track-comments
+  area: tracks
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /tracks/{track_id}/comments
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/tracks.md
+  summary: Comments on a track.
+  query:
+    - threaded
+    - limit
+    - offset
+    - client_id
+  notes: "threaded is required. Without it the route returned 400."
+
+- id: track-comment-create
+  area: tracks
+  method: POST
+  host: api-v2.soundcloud.com
+  path: /tracks/{track_id}/comments
+  auth: user-token
+  class: write
+  status: 401
+  doc: docs/tracks.md
+  summary: Create a comment.
+  query:
+    - body
+    - timestamp
+    - client_id
+  notes: "Query parameters, not a JSON body. A user token is required. The write was not executed with a token."
+
+- id: track-related
+  area: tracks
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /tracks/{track_id}/related
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/tracks.md
+  summary: Tracks related to one track.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Returns track objects."
+
+- id: track-albums
+  area: tracks
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /tracks/{track_id}/albums
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/tracks.md
+  summary: Albums that contain a track.
+  query:
+    - client_id
+  notes: "Measured collection was empty."
+
+- id: track-playlists-without-albums
+  area: tracks
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /tracks/{track_id}/playlists_without_albums
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/tracks.md
+  summary: Playlists that contain a track, excluding albums.
+  query:
+    - client_id
+  notes: "Returned nine playlists for the measured track."
+
+- id: resolve
+  area: tracks
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /resolve
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/tracks.md
+  summary: Resolve a public URL to a track or playlist.
+  query:
+    - url
+    - client_id
+  notes: "A track URL and a playlist URL both returned an object of the matching kind."
+
+- id: media
+  area: streams
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /media/{media_path}
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/streams.md
+  summary: Resolve a transcoding to a stream URL.
+  query:
+    - client_id
+  notes: "Returns url. Encrypted HLS responses also carried a licence token."
+
+- id: user
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: One user.
+  query:
+    - client_id
+  notes: "created_at was null in the measured response."
+
+- id: user-tracks
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/tracks
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Tracks uploaded by a user.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Paginated in reverse creation order. next_href carried an opaque offset."
+
+- id: user-likes
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/likes
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Tracks a user liked.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Each item is {created_at, kind, track}."
+
+- id: user-playlists
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/playlists
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Playlists owned by a user.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Included albums for the measured user."
+
+- id: user-albums
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/albums
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Albums owned by a user.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Every measured item had is_album: true."
+
+- id: user-toptracks
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/toptracks
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Top tracks for a user.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Returned 30 tracks and next_href: null."
+
+- id: user-related-artists
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/relatedartists
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Artists related to a user.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Returns user objects."
+
+- id: user-followers
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/followers
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Users who follow a user.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Returns user objects."
+
+- id: user-followings
+  area: users
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/followings
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/users.md
+  summary: Users a user follows.
+  query:
+    - limit
+    - offset
+    - client_id
+  notes: "Returns user objects."
+
+- id: playlist
+  area: playlists
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /playlists/{playlist_id}
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/playlists.md
+  summary: One playlist or album.
+  query:
+    - client_id
+  notes: "tracks[] was present and track_count matched 33."
+
+- id: search-tracks
+  area: search
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /search/tracks
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/search.md
+  summary: Search tracks.
+  query:
+    - q
+    - limit
+    - offset
+    - linked_partitioning
+    - client_id
+  notes: "Results carried media in this measurement."
+
+- id: search-users
+  area: search
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /search/users
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/search.md
+  summary: Search users.
+  query:
+    - q
+    - limit
+    - offset
+    - linked_partitioning
+    - client_id
+  notes: "Returns user objects."
+
+- id: search-playlists
+  area: search
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /search/playlists
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/search.md
+  summary: Search playlists.
+  query:
+    - q
+    - limit
+    - offset
+    - linked_partitioning
+    - client_id
+  notes: "Returns playlists, including albums."
+
+- id: search-albums
+  area: search
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /search/albums
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/search.md
+  summary: Search albums.
+  query:
+    - q
+    - limit
+    - offset
+    - linked_partitioning
+    - client_id
+  notes: "Returns playlists with is_album: true."
+
+- id: charts
+  area: charts
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /charts
+  auth: client_id
+  class: read
+  status: 200
+  doc: docs/charts.md
+  summary: Trending charts.
+  query:
+    - kind
+    - genre
+    - limit
+    - offset
+    - client_id
+  notes: "kind=top returned 404. kind=trending with the all-music genre returned 200."
+
+- id: me
+  area: auth
+  method: GET
+  host: api-v2.soundcloud.com
+  path: /me
+  auth: user-token
+  class: read
+  status: 401
+  doc: docs/auth.md
+  summary: The signed-in user.
+  query:
+    - client_id
+  notes: "Client id only returned 401 with an empty body."
+
+- id: track-like
+  area: likes
+  method: PUT
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/track_likes/{track_id}
+  auth: user-token
+  class: write
+  status: 401
+  doc: docs/likes.md
+  summary: Like a track for a user.
+  query:
+    - client_id
+  notes: "A request without a user token returned 401 with an empty body. No write was executed."
+
+- id: track-unlike
+  area: likes
+  method: DELETE
+  host: api-v2.soundcloud.com
+  path: /users/{user_id}/track_likes/{track_id}
+  auth: user-token
+  class: write
+  status: 401
+  doc: docs/likes.md
+  summary: Remove a user's like from a track.
+  query:
+    - client_id
+  notes: "A request without a user token returned 401 with an empty body. No write was executed."
