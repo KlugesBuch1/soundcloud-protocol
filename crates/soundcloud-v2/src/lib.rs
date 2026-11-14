@@ -1,33 +1,60 @@
 #![deny(missing_docs)]
 //! Read-only client for the api-v2 routes documented in this repository.
 
+use std::sync::RwLock;
 use std::time::Duration;
 
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
+use tokio::sync::Mutex as AsyncMutex;
 
 const DEFAULT_BASE_URL: &str = "https://api-v2.soundcloud.com";
 const PLAYER_URL: &str = "https://soundcloud.com/";
 const ASSET_PREFIX: &str = "https://a-v2.sndcdn.com/assets/";
 const ID_MARKER: &str = "client_id:\"";
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const BROWSER_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 /// Client for the measured read routes.
+///
+/// The client id is resolved once and kept in memory for the lifetime of the
+/// value. A request that comes back `401` triggers one re-resolve and one retry
+/// with the new id. Nothing is written to disk.
 pub struct Client {
     http: reqwest::Client,
-    client_id: String,
+    client_id: RwLock<String>,
+    refresh: AsyncMutex<()>,
     base_url: String,
+    player_url: String,
+    asset_prefix: String,
 }
 
 impl Client {
     /// Creates a client with a client id.
-    pub fn new(client_id: String) -> Self {
+    pub fn new(client_id: impl Into<String>) -> Self {
+        let http = reqwest::Client::builder()
+            .timeout(REQUEST_TIMEOUT)
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+        Self::with_http(http, client_id.into())
+    }
+
+    fn with_http(http: reqwest::Client, client_id: String) -> Self {
         Self {
-            http: reqwest::Client::new(),
-            client_id,
+            http,
+            client_id: RwLock::new(client_id),
+            refresh: AsyncMutex::new(()),
             base_url: DEFAULT_BASE_URL.to_string(),
+            player_url: PLAYER_URL.to_string(),
+            asset_prefix: ASSET_PREFIX.to_string(),
         }
+    }
+
+    /// Replaces the HTTP client, for a custom timeout, proxy or TLS setup.
+    pub fn with_http_client(mut self, http: reqwest::Client) -> Self {
+        self.http = http;
+        self
     }
 
     /// Replaces the API base URL.
@@ -36,51 +63,49 @@ impl Client {
         self
     }
 
+    /// Replaces the player page and asset prefix used to resolve a client id.
+    ///
+    /// The defaults point at `soundcloud.com` and `a-v2.sndcdn.com`. Override
+    /// these to run against a mirror or a test server.
+    pub fn with_discovery_urls(
+        mut self,
+        player_url: impl Into<String>,
+        asset_prefix: impl Into<String>,
+    ) -> Self {
+        self.player_url = player_url.into();
+        self.asset_prefix = asset_prefix.into();
+        self
+    }
+
+    /// Returns the client id currently held in memory.
+    pub fn client_id(&self) -> String {
+        self.client_id
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+    }
+
+    /// Resolves a fresh client id from the player assets and replaces the held one.
+    ///
+    /// Refreshes are serialised, so two calls do not run discovery at the same
+    /// time. A discovery failure leaves the held id untouched.
+    pub async fn refresh_client_id(&self) -> Result<String, Error> {
+        let _guard = self.refresh.lock().await;
+        let id = discover_client_id(&self.http, &self.player_url, &self.asset_prefix).await?;
+        self.store_client_id(&id);
+        Ok(id)
+    }
+
     /// Creates a client by resolving the current client id from the web player.
     ///
     /// Reads the landing page, fetches the player assets it references and uses
     /// the first `client_id` literal it finds. The value is kept in memory.
     pub async fn discover() -> Result<Self, Error> {
         let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(REQUEST_TIMEOUT)
             .build()?;
-        let response = http
-            .get(PLAYER_URL)
-            .header(reqwest::header::USER_AGENT, BROWSER_USER_AGENT)
-            .send()
-            .await?;
-        if !response.status().is_success() {
-            return Err(Error::Discovery(format!(
-                "the player page returned HTTP {}",
-                response.status().as_u16()
-            )));
-        }
-        let html = response.text().await?;
-        let urls = script_urls(&html);
-        if urls.is_empty() {
-            return Err(Error::Discovery(
-                "the player page referenced no assets".to_string(),
-            ));
-        }
-        for url in urls {
-            let response = http
-                .get(&url)
-                .header(reqwest::header::USER_AGENT, BROWSER_USER_AGENT)
-                .send()
-                .await?;
-            if !response.status().is_success() {
-                continue;
-            }
-            let script = response.text().await?;
-            if let Some(id) = find_client_id(&script) {
-                let mut client = Client::new(id.to_string());
-                client.http = http;
-                return Ok(client);
-            }
-        }
-        Err(Error::Discovery(
-            "no client id in the player assets".to_string(),
-        ))
+        let id = discover_client_id(&http, PLAYER_URL, ASSET_PREFIX).await?;
+        Ok(Self::with_http(http, id))
     }
 
     /// Returns one track.
@@ -98,9 +123,45 @@ impl Client {
         self.get("/tracks", &[("ids", ids)]).await
     }
 
+    /// Returns tracks related to a track.
+    pub async fn related_tracks(&self, track_id: u64) -> Result<Page<Track>, Error> {
+        self.get(&format!("/tracks/{track_id}/related"), &[]).await
+    }
+
+    /// Returns albums a track appears on.
+    pub async fn track_albums(&self, track_id: u64) -> Result<Page<Playlist>, Error> {
+        self.get(&format!("/tracks/{track_id}/albums"), &[]).await
+    }
+
+    /// Returns playlists a track appears on, excluding albums.
+    pub async fn track_playlists_without_albums(
+        &self,
+        track_id: u64,
+    ) -> Result<Page<Playlist>, Error> {
+        self.get(&format!("/tracks/{track_id}/playlists_without_albums"), &[])
+            .await
+    }
+
     /// Searches tracks.
     pub async fn search_tracks(&self, query: &str) -> Result<SearchPage<Track>, Error> {
         self.get("/search/tracks", &[("q", query.to_string())])
+            .await
+    }
+
+    /// Searches users.
+    pub async fn search_users(&self, query: &str) -> Result<SearchPage<User>, Error> {
+        self.get("/search/users", &[("q", query.to_string())]).await
+    }
+
+    /// Searches playlists.
+    pub async fn search_playlists(&self, query: &str) -> Result<SearchPage<Playlist>, Error> {
+        self.get("/search/playlists", &[("q", query.to_string())])
+            .await
+    }
+
+    /// Searches albums.
+    pub async fn search_albums(&self, query: &str) -> Result<SearchPage<Playlist>, Error> {
+        self.get("/search/albums", &[("q", query.to_string())])
             .await
     }
 
@@ -112,6 +173,42 @@ impl Client {
     /// Returns a user's tracks.
     pub async fn user_tracks(&self, user_id: u64) -> Result<Page<Track>, Error> {
         self.get(&format!("/users/{user_id}/tracks"), &[]).await
+    }
+
+    /// Returns a user's liked tracks.
+    pub async fn user_likes(&self, user_id: u64) -> Result<Page<Track>, Error> {
+        self.get(&format!("/users/{user_id}/likes"), &[]).await
+    }
+
+    /// Returns a user's playlists.
+    pub async fn user_playlists(&self, user_id: u64) -> Result<Page<Playlist>, Error> {
+        self.get(&format!("/users/{user_id}/playlists"), &[]).await
+    }
+
+    /// Returns a user's albums.
+    pub async fn user_albums(&self, user_id: u64) -> Result<Page<Playlist>, Error> {
+        self.get(&format!("/users/{user_id}/albums"), &[]).await
+    }
+
+    /// Returns a user's top tracks.
+    pub async fn user_toptracks(&self, user_id: u64) -> Result<Page<Track>, Error> {
+        self.get(&format!("/users/{user_id}/toptracks"), &[]).await
+    }
+
+    /// Returns artists related to a user.
+    pub async fn user_related_artists(&self, user_id: u64) -> Result<Page<User>, Error> {
+        self.get(&format!("/users/{user_id}/relatedartists"), &[])
+            .await
+    }
+
+    /// Returns a user's followers.
+    pub async fn user_followers(&self, user_id: u64) -> Result<Page<User>, Error> {
+        self.get(&format!("/users/{user_id}/followers"), &[]).await
+    }
+
+    /// Returns the users a user follows.
+    pub async fn user_followings(&self, user_id: u64) -> Result<Page<User>, Error> {
+        self.get(&format!("/users/{user_id}/followings"), &[]).await
     }
 
     /// Returns one playlist or album.
@@ -127,10 +224,86 @@ impl Client {
     /// Resolves a transcoding to a stream URL.
     pub async fn resolve_transcoding(&self, transcoding: &Transcoding) -> Result<StreamUrl, Error> {
         let response = self
-            .http
-            .get(&transcoding.url)
-            .query(&[("client_id", self.client_id.as_str())])
-            .send()
+            .send(|id| self.http.get(with_client_id(&transcoding.url, id)))
+            .await?;
+        self.decode(response).await
+    }
+
+    /// Fetches the next page of a list response.
+    ///
+    /// `next_href` is absolute and does not carry a client id on the search
+    /// routes, so the id is added here. Returns `None` at the end of the list.
+    pub async fn next_page<T>(&self, page: &Page<T>) -> Result<Option<Page<T>>, Error>
+    where
+        T: DeserializeOwned,
+    {
+        match page.next_href.as_deref() {
+            Some(href) => self.get_url(href).await.map(Some),
+            None => Ok(None),
+        }
+    }
+
+    async fn send(
+        &self,
+        build: impl Fn(&str) -> reqwest::RequestBuilder,
+    ) -> Result<Response, Error> {
+        let id = self.client_id();
+        let response = build(&id).send().await?;
+        if response.status() != reqwest::StatusCode::UNAUTHORIZED {
+            return Ok(response);
+        }
+        match self.fresh_client_id(&id).await? {
+            Some(fresh) => Ok(build(&fresh).send().await?),
+            None => Ok(response),
+        }
+    }
+
+    /// Re-resolves the id after a `401`. Returns `None` when discovery produced
+    /// the same id, which means the `401` came from a missing user token.
+    async fn fresh_client_id(&self, stale: &str) -> Result<Option<String>, Error> {
+        let _guard = self.refresh.lock().await;
+        let current = self.client_id();
+        if current != stale {
+            return Ok(Some(current));
+        }
+        let discovered =
+            discover_client_id(&self.http, &self.player_url, &self.asset_prefix).await?;
+        if discovered == stale {
+            return Ok(None);
+        }
+        self.store_client_id(&discovered);
+        Ok(Some(discovered))
+    }
+
+    fn store_client_id(&self, id: &str) {
+        let mut held = self
+            .client_id
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *held = id.to_string();
+    }
+
+    async fn get<T>(&self, path: &str, query: &[(&str, String)]) -> Result<T, Error>
+    where
+        T: DeserializeOwned,
+    {
+        let response = self
+            .send(|id| {
+                self.http
+                    .get(format!("{}{}", self.base_url, path))
+                    .query(&[("client_id", id)])
+                    .query(query)
+            })
+            .await?;
+        self.decode(response).await
+    }
+
+    async fn get_url<T>(&self, url: &str) -> Result<T, Error>
+    where
+        T: DeserializeOwned,
+    {
+        let response = self
+            .send(|id| self.http.get(with_client_id(url, id)))
             .await?;
         self.decode(response).await
     }
@@ -156,20 +329,6 @@ impl Client {
         }
         self.get(&format!("/tracks/{track_id}/comments"), &query)
             .await
-    }
-
-    async fn get<T>(&self, path: &str, query: &[(&str, String)]) -> Result<T, Error>
-    where
-        T: DeserializeOwned,
-    {
-        let response = self
-            .http
-            .get(format!("{}{}", self.base_url, path))
-            .query(&[("client_id", self.client_id.as_str())])
-            .query(query)
-            .send()
-            .await?;
-        self.decode(response).await
     }
 
     async fn decode<T>(&self, response: Response) -> Result<T, Error>
@@ -233,6 +392,8 @@ pub struct Track {
     pub artwork_url: Option<String>,
     /// Creation timestamp.
     pub created_at: Option<String>,
+    /// Display timestamp.
+    pub display_date: Option<String>,
     /// Last modification timestamp.
     pub last_modified: Option<String>,
     /// Release timestamp.
@@ -241,12 +402,20 @@ pub struct Track {
     pub duration: Option<u64>,
     /// Full duration in milliseconds.
     pub full_duration: Option<u64>,
+    /// Genre.
+    pub genre: Option<String>,
+    /// License name.
+    pub license: Option<String>,
     /// Stream flag.
     pub streamable: Option<bool>,
     /// Playback policy.
     pub policy: Option<String>,
     /// Monetization model.
     pub monetization_model: Option<String>,
+    /// Download flag.
+    pub downloadable: Option<bool>,
+    /// Download count.
+    pub download_count: Option<u64>,
     /// Comment flag.
     pub commentable: Option<bool>,
     /// Comment count.
@@ -471,10 +640,60 @@ pub enum Resolved {
     Playlist(Playlist),
 }
 
-fn script_urls(html: &str) -> Vec<String> {
+async fn discover_client_id(
+    http: &reqwest::Client,
+    player_url: &str,
+    asset_prefix: &str,
+) -> Result<String, Error> {
+    let response = http
+        .get(player_url)
+        .header(reqwest::header::USER_AGENT, BROWSER_USER_AGENT)
+        .send()
+        .await?;
+    if !response.status().is_success() {
+        return Err(Error::Discovery(format!(
+            "the player page returned HTTP {}",
+            response.status().as_u16()
+        )));
+    }
+    let html = response.text().await?;
+    let urls = script_urls(&html, asset_prefix);
+    if urls.is_empty() {
+        return Err(Error::Discovery(
+            "the player page referenced no assets".to_string(),
+        ));
+    }
+    for url in urls {
+        let response = http
+            .get(&url)
+            .header(reqwest::header::USER_AGENT, BROWSER_USER_AGENT)
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            continue;
+        }
+        let script = response.text().await?;
+        if let Some(id) = find_client_id(&script) {
+            return Ok(id.to_string());
+        }
+    }
+    Err(Error::Discovery(
+        "no client id in the player assets".to_string(),
+    ))
+}
+
+fn with_client_id(url: &str, client_id: &str) -> String {
+    if url.contains("client_id=") {
+        return url.to_string();
+    }
+    let separator = if url.contains('?') { '&' } else { '?' };
+    format!("{url}{separator}client_id={client_id}")
+}
+
+fn script_urls(html: &str, asset_prefix: &str) -> Vec<String> {
     let mut urls: Vec<String> = Vec::new();
     let mut rest = html;
-    while let Some(start) = rest.find(ASSET_PREFIX) {
+    while let Some(start) = rest.find(asset_prefix) {
         let tail = &rest[start..];
         let Some(end) = tail.find('"') else {
             break;
@@ -526,7 +745,7 @@ mod tests {
 <script src="https://a-v2.sndcdn.com/assets/55-a70a06aa.js"></script>
 <script src="https://a-v2.sndcdn.com/assets/59-ac0a49ce.js"></script>"#;
         assert_eq!(
-            script_urls(html),
+            script_urls(html, ASSET_PREFIX),
             vec![
                 "https://a-v2.sndcdn.com/assets/59-ac0a49ce.js",
                 "https://a-v2.sndcdn.com/assets/55-a70a06aa.js",
@@ -667,5 +886,211 @@ mod tests {
     fn parses_resolved_playlist() {
         let resolved: Resolved = load("playlist.json");
         assert!(matches!(resolved, Resolved::Playlist(_)));
+    }
+
+    const FRESH_ID: &str = "zyxwvutsrqponmlkjihgfedcba987654";
+
+    #[test]
+    fn appends_client_id_when_missing() {
+        assert_eq!(
+            with_client_id("https://api-v2.soundcloud.com/tracks/1", "abc"),
+            "https://api-v2.soundcloud.com/tracks/1?client_id=abc"
+        );
+        assert_eq!(
+            with_client_id("https://api-v2.soundcloud.com/search/tracks?q=a", "abc"),
+            "https://api-v2.soundcloud.com/search/tracks?q=a&client_id=abc"
+        );
+        assert_eq!(
+            with_client_id("https://api-v2.soundcloud.com/tracks?client_id=old", "abc"),
+            "https://api-v2.soundcloud.com/tracks?client_id=old"
+        );
+    }
+
+    #[test]
+    fn exposes_the_held_client_id() {
+        let client = Client::new(FAKE_ID);
+        assert_eq!(client.client_id(), FAKE_ID);
+    }
+
+    #[tokio::test]
+    async fn next_page_stops_at_the_end() {
+        let client = Client::new(FAKE_ID);
+        let page: Page<Track> = Page {
+            collection: Vec::new(),
+            total_results: None,
+            next_href: None,
+            query_urn: None,
+        };
+        assert!(client.next_page(&page).await.expect("page").is_none());
+    }
+
+    async fn spawn_server<F>(handler: F) -> String
+    where
+        F: Fn(&str) -> (u16, String) + Clone + Send + 'static,
+    {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test server");
+        let address = listener.local_addr().expect("test server address");
+        tokio::spawn(async move {
+            loop {
+                let Ok((mut stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let handler = handler.clone();
+                tokio::spawn(async move {
+                    let mut buf = vec![0_u8; 8192];
+                    let mut filled = 0;
+                    loop {
+                        let read = stream.read(&mut buf[filled..]).await.unwrap_or(0);
+                        if read == 0 {
+                            break;
+                        }
+                        filled += read;
+                        if buf[..filled].windows(4).any(|window| window == b"\r\n\r\n") {
+                            break;
+                        }
+                    }
+                    let request = String::from_utf8_lossy(&buf[..filled]).to_string();
+                    let (status, body) = handler(&request);
+                    let reason = match status {
+                        200 => "OK",
+                        401 => "Unauthorized",
+                        _ => "Not Found",
+                    };
+                    let response = format!(
+                        "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = stream.write_all(response.as_bytes()).await;
+                    let _ = stream.shutdown().await;
+                });
+            }
+        });
+        format!("http://{address}")
+    }
+
+    fn request_path(request: &str) -> &str {
+        request
+            .lines()
+            .next()
+            .and_then(|line| line.split_whitespace().nth(1))
+            .unwrap_or("/")
+    }
+
+    fn request_host(request: &str) -> &str {
+        request
+            .lines()
+            .find(|line| line.len() > 5 && line[..5].eq_ignore_ascii_case("host:"))
+            .map(|line| line[5..].trim())
+            .unwrap_or("127.0.0.1")
+    }
+
+    #[tokio::test]
+    async fn refreshes_the_client_id_once_and_reuses_it() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let discoveries = Arc::new(AtomicUsize::new(0));
+        let counter = discoveries.clone();
+        let base = spawn_server(move |request| {
+            let path = request_path(request).to_string();
+            let host = request_host(request).to_string();
+            if path == "/player" {
+                counter.fetch_add(1, Ordering::SeqCst);
+                return (
+                    200,
+                    format!(r#"<script src="http://{host}/assets/app.js"></script>"#),
+                );
+            }
+            if path == "/assets/app.js" {
+                return (200, format!(r#"e.client_id:"{FRESH_ID}""#));
+            }
+            if path.starts_with("/tracks/1") {
+                if path.contains("client_id=stale") {
+                    return (401, String::new());
+                }
+                return (200, r#"{"id":1,"kind":"track","title":"ok"}"#.to_string());
+            }
+            (404, String::new())
+        })
+        .await;
+
+        let client = Client::new("stale")
+            .with_base_url(&base)
+            .with_discovery_urls(format!("{base}/player"), format!("{base}/assets/"));
+
+        let track = client.track(1).await.expect("first track");
+        assert_eq!(track.id, 1);
+        assert_eq!(client.client_id(), FRESH_ID);
+
+        let track = client.track(1).await.expect("second track");
+        assert_eq!(track.id, 1);
+        assert_eq!(
+            discoveries.load(Ordering::SeqCst),
+            1,
+            "the client id is resolved once per session, not per request"
+        );
+    }
+
+    #[tokio::test]
+    async fn keeps_unauthorized_when_discovery_finds_the_same_id() {
+        let base = spawn_server(|request| {
+            let path = request_path(request).to_string();
+            let host = request_host(request).to_string();
+            if path == "/player" {
+                return (
+                    200,
+                    format!(r#"<script src="http://{host}/assets/app.js"></script>"#),
+                );
+            }
+            if path == "/assets/app.js" {
+                return (200, format!(r#"e.client_id:"{FAKE_ID}""#));
+            }
+            (401, String::new())
+        })
+        .await;
+
+        let client = Client::new(FAKE_ID)
+            .with_base_url(&base)
+            .with_discovery_urls(format!("{base}/player"), format!("{base}/assets/"));
+
+        assert!(matches!(client.track(1).await, Err(Error::Unauthorized)));
+    }
+
+    #[tokio::test]
+    async fn next_page_adds_the_client_id_to_next_href() {
+        let base = spawn_server(|request| {
+            let path = request_path(request).to_string();
+            if path.contains("/search/tracks")
+                && path.contains("offset=2")
+                && path.contains("client_id=")
+            {
+                return (
+                    200,
+                    r#"{"collection":[{"id":3}],"next_href":null}"#.to_string(),
+                );
+            }
+            (401, String::new())
+        })
+        .await;
+
+        let client = Client::new(FAKE_ID).with_base_url(&base);
+        let page: Page<Track> = Page {
+            collection: Vec::new(),
+            total_results: None,
+            next_href: Some(format!("{base}/search/tracks?q=x&offset=2")),
+            query_urn: None,
+        };
+
+        let next = client
+            .next_page(&page)
+            .await
+            .expect("next page")
+            .expect("a page");
+        assert_eq!(next.collection[0].id, 3);
+        assert!(next.next_href.is_none());
     }
 }

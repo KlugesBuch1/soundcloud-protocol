@@ -14,6 +14,7 @@ It is unofficial and does not cover the whole API surface.
 | [`endpoints.yaml`](endpoints.yaml) | All 27 measured routes |
 | [`docs/conventions.md`](docs/conventions.md) | Placeholders, headers, pagination and status codes |
 | [`docs/auth.md`](docs/auth.md) | The client id, the user token and the routes that need one |
+| [`docs/client.md`](docs/client.md) | Client id lifetime, playback loop, transcoding choice, pagination and caching |
 | [`docs/tracks.md`](docs/tracks.md) | The track object, transcodings, policies and comments |
 | [`docs/streams.md`](docs/streams.md) | The two-step resolve and the four protocols |
 | [`docs/search.md`](docs/search.md) | Tracks, users, playlists and albums |
@@ -31,8 +32,9 @@ It is unofficial and does not cover the whole API surface.
 ## Rust client
 
 [`crates/soundcloud-v2`](crates/soundcloud-v2) is the reference Rust client for these endpoints. It
-covers tracks, tracks by ids, search, users, playlists, resolve, transcoding resolve, charts and
-comments. `Client::discover()` resolves the current client id. Published on crates.io as
+covers tracks, related tracks, albums, search, users, user collections, playlists, resolve,
+transcoding resolve, charts and comments. `Client::discover()` resolves the current client id once,
+keeps it in memory and refreshes it after a `401`. Published on crates.io as
 [`soundcloud-v2`](https://crates.io/crates/soundcloud-v2).
 
 ## The index

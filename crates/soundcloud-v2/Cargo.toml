@@ -1,6 +1,6 @@
 [package]
 name = "soundcloud-v2"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 description = "Read-only client for the SoundCloud api-v2 routes in the catalogue"
 license = "MIT"
@@ -14,4 +14,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["net", "io-util"] }
