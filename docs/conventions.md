@@ -16,7 +16,7 @@ Paths use braces for values:
 | `{track_ids}` | Comma-separated track ids |
 | `{user_id}` | Numeric user id |
 | `{playlist_id}` | Numeric playlist id |
-| `{media_path}` | The path after the host in a transcoding `url` |
+| `{media_path}` | The path after `/media/` in a transcoding `url` |
 
 Example ids in this repository are synthetic. Track `123456789`, user `987654321` and playlist `246810121` do not identify live objects.
 

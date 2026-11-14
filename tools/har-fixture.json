@@ -1,0 +1,217 @@
+{
+  "log": {
+    "version": "1.2",
+    "creator": {
+      "name": "synthetic fixture",
+      "version": "1"
+    },
+    "entries": [
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://api-v2.soundcloud.com/tracks/48219?client_id&foo=bar",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Authorization",
+              "value": "OAuth fixture-token"
+            },
+            {
+              "name": "Cookie",
+              "value": "fixture=1"
+            }
+          ],
+          "queryString": [
+            {
+              "name": "client_id",
+              "value": ""
+            },
+            {
+              "name": "foo",
+              "value": "bar"
+            }
+          ]
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"id\": 48219, \"kind\": \"track\", \"title\": \"Example Track\", \"client_id\": \"fixture-client-id\", \"secret_token\": \"fixture-secret\", \"track_authorization\": \"fixture-track-authorization\", \"permalink_url\": \"https://soundcloud.com/example-artist/example-track\", \"user\": {\"id\": 12345, \"username\": \"Example Artist\"}, \"media\": {\"transcodings\": [{\"url\": \"https://api-v2.soundcloud.com/media/soundcloud:tracks:48219/abc/stream/progressive?client_id&Signature=fixture-signature&foo=bar\"}]}}"
+          }
+        },
+        "timings": {
+          "send": 0,
+          "wait": 1,
+          "receive": 1
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://api-v2.soundcloud.com/tracks/48219?client_id",
+          "httpVersion": "HTTP/1.1",
+          "headers": [],
+          "queryString": []
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"id\": 48219, \"kind\": \"track\", \"title\": \"Example Track\", \"client_id\": \"fixture-client-id\", \"secret_token\": \"fixture-secret\", \"track_authorization\": \"fixture-track-authorization\", \"permalink_url\": \"https://soundcloud.com/example-artist/example-track\", \"user\": {\"id\": 12345, \"username\": \"Example Artist\"}, \"media\": {\"transcodings\": [{\"url\": \"https://api-v2.soundcloud.com/media/soundcloud:tracks:48219/abc/stream/progressive?client_id&Signature=fixture-signature&foo=bar\"}]}}"
+          }
+        },
+        "timings": {
+          "send": 0,
+          "wait": 1,
+          "receive": 1
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://api-v2.soundcloud.com/tracks/48219/comments?threaded=1&client_id",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Authorization",
+              "value": "OAuth fixture-token"
+            }
+          ],
+          "queryString": []
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"collection\": [{\"id\": 777, \"kind\": \"comment\", \"body\": \"Example comment.\", \"track_id\": 48219, \"user\": {\"id\": 12345, \"username\": \"Example Artist\"}, \"secret_token\": \"fixture-secret\"}], \"next_href\": null, \"query_urn\": null}"
+          }
+        },
+        "timings": {
+          "send": 0,
+          "wait": 1,
+          "receive": 1
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://api-v2.soundcloud.com/media/soundcloud:tracks:48219/abc/stream/progressive?client_id&Policy=fixture-policy&Signature=fixture-signature&Key-Pair-Id=fixture-key",
+          "httpVersion": "HTTP/1.1",
+          "headers": [],
+          "queryString": []
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"url\": \"https://cdn.example/example.mp3?client_id&Signature=fixture-signature&foo=bar\", \"licenseAuthToken\": \"fixture-license\"}"
+          }
+        },
+        "timings": {
+          "send": 0,
+          "wait": 1,
+          "receive": 1
+        }
+      },
+      {
+        "request": {
+          "method": "PUT",
+          "url": "https://api-v2.soundcloud.com/users/12345/track_likes/48219?client_id",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Authorization",
+              "value": "OAuth fixture-token"
+            },
+            {
+              "name": "Cookie",
+              "value": "fixture=1"
+            }
+          ],
+          "queryString": []
+        },
+        "response": {
+          "status": 401,
+          "statusText": "",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{}"
+          }
+        },
+        "timings": {
+          "send": 0,
+          "wait": 1,
+          "receive": 1
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://example.com/tracks/48219",
+          "httpVersion": "HTTP/1.1",
+          "headers": [],
+          "queryString": []
+        },
+        "response": {
+          "status": 200,
+          "statusText": "",
+          "httpVersion": "HTTP/1.1",
+          "headers": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"id\": 48219}"
+          }
+        },
+        "timings": {
+          "send": 0,
+          "wait": 1,
+          "receive": 1
+        }
+      }
+    ]
+  }
+}
