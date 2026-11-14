@@ -1,0 +1,43 @@
+{
+  "genre": "soundcloud:genres:all-music",
+  "kind": "trending",
+  "last_updated": "2025-01-07T00:00:00Z",
+  "collection": [
+    {
+      "score": 0.91,
+      "track": {
+        "id": 123456789,
+        "kind": "track",
+        "urn": "soundcloud:tracks:123456789",
+        "title": "Example Track",
+        "permalink_url": "https://soundcloud.com/example-artist/example-track-123456789",
+        "duration": 240000,
+        "streamable": true,
+        "policy": "MONETIZE",
+        "user_id": 987654321,
+        "media": {
+          "transcodings": []
+        }
+      }
+    },
+    {
+      "score": 0.82,
+      "track": {
+        "id": 123456790,
+        "kind": "track",
+        "urn": "soundcloud:tracks:123456790",
+        "title": "Example Track Two",
+        "permalink_url": "https://soundcloud.com/example-artist/example-track-123456790",
+        "duration": 240000,
+        "streamable": true,
+        "policy": "MONETIZE",
+        "user_id": 987654321,
+        "media": {
+          "transcodings": []
+        }
+      }
+    }
+  ],
+  "query_urn": "soundcloud:charts:example",
+  "next_href": null
+}
