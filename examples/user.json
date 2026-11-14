@@ -11,7 +11,7 @@
   "avatar_url": "https://i1.sndcdn.com/avatars-example-large.jpg",
   "city": "Contoso",
   "country_code": "US",
-  "created_at": "2020-01-01T00:00:00Z",
+  "created_at": null,
   "last_modified": "2025-01-04T00:00:00Z",
   "track_count": 12,
   "playlist_count": 2,
